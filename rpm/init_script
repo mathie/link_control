@@ -1,0 +1,50 @@
+#! /bin/sh
+#
+# firewall      Sets up the firewall (including masquerading rules) using
+#		IP Chains.  In the future, I may rewrite it to cope with
+#		ipfwadm too.
+#
+# Author:       Graeme Mathieson <ggm@dcs.ed.ac.uk>
+#
+# chkconfig: 345 50 50
+# description: Sets up firewalling rules, including masquerading.
+
+# since this is a local thingie
+export PATH=$PATH:/usr/local/bin
+
+# Source function library.
+. /etc/rc.d/init.d/functions
+
+# Get config.
+. /etc/sysconfig/network
+
+# Check that networking is up.
+if [ ${NETWORKING} = "no" ]
+then
+	exit 0
+fi
+
+# See how we were called.
+case "$1" in
+  start)
+	echo -n "Starting link controller:  "
+	daemon /usr/local/bin/link-server
+	touch /var/lock/subsys/link-server
+	echo
+	;;
+  stop)
+	echo -n "Stopping link controller:  "
+	killproc link-server
+	rm -f /var/lock/subsys/link-server
+	echo
+	;;
+  restart|reload)
+	$0 stop
+	$0 start
+	;;
+  *)
+	echo "Usage: $0 {start|stop|restart|reload}"
+	exit 1
+esac
+
+exit 0

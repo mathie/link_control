@@ -1,0 +1,52 @@
+States
+------
+
+Each device in the server can be in one of the following states.  The paths
+shown between them are all the possible transitions:
+
+
+ +-----------------+			+---------------+
+ |   Connecting    |------------------->|    Link Up    |
+ +-----------------+			+---------------+
+	^	^-------\			|
+	|		 \			|
+	|		  \ 			|
+	|		   \  			|
+	|		    \			|
+	|		     \			|
+	|		      \			|
+	|		       \		|
+	|			\		|
+	|			 \		|
+	|			  \		|
+	|			   \		|
+	|			    \		|
+	|			     \		|
+	|			      \		|
+	|		       	       \-----V  V
+ +-----------------+			+---------------+
+ |    Link Down    |<-------------------| Disconnecting |
+ +-----------------+			+---------------+
+
+The following state transitions are possible:
+
+From State	| To State	| command	| requested by
+----------------+---------------+---------------+----------------------------
+Connecting	| Disconnecting	| DOWN		| Client
+Connecting	| Link Up	| ISUP		| Notification Peer
+Connecting	| Link Down	| n/a		| Server
+Disconnecting	| Connecting	| UP		| Client
+Disconnecting	| Link Up	| n/a		| Server
+Disconnecting	| Link Down	| ISDOWN	| Notification Peer
+Link Up		| Disconnecting	| DOWN		| Client
+Link Up		| Disconnecting	| FORCE_DOWN	| Client
+Link Down	| Connecting	| UP		| Client
+Link Down	| Disconnecting | FORCE_DOWN	| Client
+
+The following state transitions are impossible:
+
+From State	| To State	| Why?
+----------------+---------------+--------------------------------------------
+Link Up		| Connecting	| How can it connect if its already connected?
+Link Up		| Link Down	| must pass through disconnecting first
+Link Down	| Link Up	| Must pass through connecting first

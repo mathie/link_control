@@ -1,0 +1,134 @@
+Link Controller
+---------------
+
+This file describes the protocol used to communicate with the link server.
+There are two possible scenarios for communicating with the server - a client
+which wishes to connect or disconnect from the internet, or a notification
+peer which wishes to inform the server of the current link status.  The
+method for communicating this protocol is to use a single UDP packet for
+each command.  If a command expects a response, then after sending the data,
+the client should then listen for a response (until a certain time has elapsed,
+since UDP provides a 'best effort' service).
+
+The port which the server listens on is UDP port 6789.  The client uses 
+UDP port 9876 to receive messages.  These have still to be confirmed as
+unused, but they are certainly not used on the systems I'm installing this
+on for now.
+
+Notification peer
+-----------------
+
+The notification peer simply sends a message to the server when its current
+status changes.  For example, this program could be run from within 
+the /etc/ppp/ip-[up,down] scripts for PPP links.
+
+All messages from the notification peer are prefixed by "NOTIFY " to indicate
+that they came from the peer.  The following messages apply to the
+notification peer:
+
+ISUP <device>		Indicates to the server that the particular device is
+			now active.  Currently the <device> argument is
+			ignored, since the server only supports the control
+			of PPP0, but it has been put in for future expansion.
+ISDOWN <device>		Indicates to the server that the particular device
+			has been stopped.  Again the device argument is ignored
+			but may be used in the future.
+
+Client
+------
+
+The client send messages to the server to control the status of the link and
+to request an update on the current status.  Clients are authenticated, purely
+by their IP address.  This way, the server can store details on the current
+status of the client (whether the client has requested the link be brought
+up or down).  If the server has no knowlege of the client, the client status
+defaults to down.  If the client does not communicate with the server for
+an extended period of time, it is assumed that the client has disappeared and
+its status information is lost.
+
+All messages from the client are prefixed with "CLIENT " to indicate that
+they are from the client.  The message from the client are:
+
+PING			Ping the server to indicate that the client is
+			still alive.  The client should do this more often
+			than the client timeout, if it doesn't want to
+			be removed from the server's data structures.
+DEVICES			Request a list of devices from the server which can
+			be controlled.  This is unimplemented so far.  The
+			response message from the server is also "DEVICES"
+			with an array of string pairs (name, description)...
+UP <device>		Request the particular device be brought up.  This
+			should be called regardless of the current status of
+			the link, since the server keeps track of who wishes
+			access to this device.
+DOWN <device>		Requests that the particular device be brought down
+			(if noody else has an interest in it).  This should
+			also be called, regardless of the current status of
+			the device, since it indicates that the current client
+			is finished with the device.
+FORCE_DOWN <device>	Forces a device to go down.  This is a fail-safe
+			command, which basically resets the client status for
+			this device and issues the link_down command,
+			regardless of what it thinks the current state is.
+STATUS <device>		Requests the status of the specified device.  The
+			response message is also "STATUS" with the format
+			specified below.
+CLIENT_STATUS		Request the current known status of the client.  This
+			is designed to be able to re-initialise a client if
+			it has been closed then re-opened.  The matching
+			response message is also "CLIENT_STATUS".
+
+Server
+------
+
+The server keeps track of which clients wish to be connected to which devices
+and the current status of the devices.  It also broadcasts regular messages
+to indicate the current status of all the devices.
+
+All messages from the server are prefixed with "SERVER ".  The following
+messages are sent as responses to messages sent to the server:
+
+DEVICES <device>\t<description>\n,...	A set of strings describing all the
+			devices that the server has control over.  The device
+			is followed by a tab and the description is followed
+			by a newline.  The end of the device list is indicated
+			by a NULL character (which is handy for using string-
+			handling functions :)
+STATUS <device> UP <time> <no_users>	If the device is currently up, the
+			server will respond with this message, indicating that
+			the device is up, the time it has been up (in seconds)
+			and the number of users that wish the link to be
+			active.
+STATUS <device> DOWN	If the device is currently down, the server will
+			respond with this message.
+STATUS <device> CONNECTING	If the server has requested the device be
+			brought up, and is currently waiting to be informed
+			that it is up, it will return this message.
+STATUS <device> DISCONNECTING	If the server has requested that the device
+			be brought down and is currently waiting to be informed
+			that it is down, it will return this message.
+CLIENT_STATUS <device>\t<device>...	A list, delimited the same way as the
+			device list above, indicating which devices the client
+			is currently connected to.
+
+Server multicast messages
+-------------------------
+
+The server regularly sends messages to it multicast group.  It is intended to
+notify the clients of the current status of all the devices controlled by the
+server.  When initialising a client, it is also intended to notify the client
+of the server it should send messages to.  To differentiate it from other
+server messages, it will be prefixed with "BROADCAST ".  (Note, it would be
+prefixed with multicast, but I originally designed the protocol with 
+IPv4 broadcasting in mind.)  The following messages are broadcast:
+
+INIT			Notifies all clients that a new server has started and
+			that any cached information should be immediately
+			dropped since it is no longer guaranteed to be valid.
+STATUS <device>\t<status>\n...	The delimiting of the string is the same
+			as for the DEVICES message.  For each device, there is
+			a status message, corresponding to the the individual
+			status messages created to respond to a status request.
+			This message is sent out at regular intervals, or
+			immediately, if the status of the server changes.
+QUIT			To indicate that the server is about to quit.

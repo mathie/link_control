@@ -1,0 +1,3 @@
+#!/bin/sh
+
+/opt/link_control/bin/notify "NOTIFY ISUP"
